@@ -1,0 +1,127 @@
+---
+title: "data_cleaning"
+output: html_document
+---
+
+```{r}
+library(data.table)
+library(xgboost)
+library(ggplot2)
+```
+
+```{r}
+train_dataset <- fread("data_in/training_set.csv")
+test_dataset <- fread("data_in/test_set.csv")
+```
+
+```{r}
+train_label <- train_dataset$Survived
+train_matrix <- as.matrix(train_dataset[,-c("Survived"),with=FALSE])
+
+test_label <- test_dataset$Survived
+test_matrix <- as.matrix(test_dataset[,-c("Survived"),with=FALSE])
+```
+
+
+```{r}
+bst.res <- xgb.cv(nfold=3,
+               data = train_matrix, 
+               label = train_label,
+               eta = 0.01,
+               min_child_weight = 12,
+               max_depth = 2,
+               objective = "reg:linear",
+               #L2 parameter 
+               lambda = 1.1,
+               # L1 parameter 
+               alpha = 0.5, 
+               subsample = 0.6,
+               # eval_metric = "auc",
+               gamma = 1,
+               nrounds = 4000,
+               verbose = TRUE,
+               print_every_n = 10,
+               early_stop_round = 10)
+
+
+
+# x_vect <- 0:(length(bst.res$evaluation_log$train_rmse_mean)-1)
+# training_line <- bst.res$evaluation_log$train_rmse_mea
+# test_line <- bst.res$evaluation_log$test_error_mean
+# dt <- data.table(training_line,test_line,x_vect)
+
+x_vect <- 0:(length(bst.res$evaluation_log$train_rmse_mean)-1)
+training_line <- bst.res$evaluation_log$train_rmse_mean
+test_line <- bst.res$evaluation_log$test_rmse_mean
+dt <- data.table(training_line,test_line,x_vect)
+
+ggplot(dt, aes(x_vect)) + 
+  geom_line(aes(y=training_line), colour="red") + 
+  geom_line(aes(y=test_line), colour="green")
+
+```
+
+
+```{r}
+#Train the model
+bst <- xgboost(data = train_matrix, 
+               label = train_label,
+               eta = 0.01,
+               min_child_weight = 12,
+               max_depth = 2,
+               objective = "reg:linear",
+               #L2 parameter 
+               lambda = 1.1,
+               # L1 parameter 
+               alpha = 0.5, 
+               subsample = 0.6,
+               # eval_metric = "auc",
+               gamma = 1,
+               nrounds = 4000,
+               verbose = TRUE,
+               print_every_n = 10,
+               early_stop_round = 10)
+```
+
+
+ROC & AUC
+```{r}
+simple_roc <- function(labels, scores){
+  labels <- labels[order(scores, decreasing=TRUE)]
+  data.frame(TPR=cumsum(labels)/sum(labels), FPR=cumsum(!labels)/sum(!labels), labels)
+}
+
+predictions  <- predict(bst, test_matrix)
+glm_simple_roc <- simple_roc(test_label, predictions)
+```
+
+```{r}
+simple_auc <- function(TPR, FPR){
+  # inputs already sorted, best scores first 
+  dFPR <- c(diff(FPR), 0)
+  dTPR <- c(diff(TPR), 0)
+  sum(TPR * dFPR) + sum(dTPR * dFPR)/2
+}
+
+auc_value <- simple_auc(glm_simple_roc$TPR,glm_simple_roc$FPR)
+auc_value
+```
+
+
+```{r}
+p <- ggplot(glm_simple_roc,aes(FPR,TPR))
+p <- p + geom_abline(slope = 1, color="red",
+                 linetype="dashed", size=1.5)
+p <- p + geom_line(size = 1, alpha = 0.7)
+p <- p +labs(title= "ROC curve", 
+             x = "False Positive Rate (1-Specificity)", 
+             y = "True Positive Rate (Sensitivity)")
+
+p <- p + geom_text(x=0.25, y=0.5, label=paste0("AUC : ",round(auc_value,2))) 
+p <- p + theme_minimal()
+p
+```
+
+
+
+

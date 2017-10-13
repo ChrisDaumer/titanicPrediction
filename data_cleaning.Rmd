@@ -1,0 +1,64 @@
+---
+title: "data_cleaning"
+output: html_document
+---
+
+```{r}
+library(data.table)
+```
+
+```{r}
+train_dataset <- fread("data_in/train.csv")
+```
+
+get rid of useless columns
+```{r}
+train_dataset$Ticket <- NULL
+train_dataset$Cabin <- NULL
+
+train_dataset[Embarked == "S", Emb := 0]
+train_dataset[Embarked == "C", Emb := 1]
+train_dataset[Embarked == "Q", Emb := 2]
+
+train_dataset$Embarked <- NULL
+
+
+train_dataset[Sex == "male", Emb := 0]
+train_dataset[Sex == "female", Emb := 1]
+
+train_dataset$Sex <- NULL
+```
+
+
+social class feature crafting
+```{r}
+# title_woman <- c("Miss", "Mrs", "Mme", "Ms", "Mlle", "Countess")
+# title_man <- c("Mr", "Master", "Don", "Rev", "Major", "Col", "Capt", "Jonkheer", "Dr")
+
+rich_class_man <- c("Don", "Col", "Major", "Capt", "Jonkheer", "Countess", "Dr", "Master", "Rev")
+mean_class_man <- c("Mr")
+rich_class_woman <- c("Countess")
+mean_class_woman <- c("Miss", "Mrs", "Mme", "Ms", "Mlle")
+
+train_dataset$sClass <- 0
+for(class in mean_class_woman){
+  train_dataset[grep(class, train_dataset$Name), sClass := 1]
+}
+for(class in mean_class_man){
+  train_dataset[grep(class, train_dataset$Name), sClass := 1]
+}
+for(class in rich_class_woman){
+  train_dataset[grep(class, train_dataset$Name), sClass := 0]
+}
+for(class in rich_class_man){
+  train_dataset[grep(class, train_dataset$Name), sClass := 0]
+}
+
+train_dataset$Name <- NULL
+```
+
+```{r}
+fwrite(train_dataset, "./data_in/cleaned_train.csv")
+```
+
+

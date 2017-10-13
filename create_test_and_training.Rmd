@@ -1,0 +1,30 @@
+---
+title: "data_cleaning"
+output: html_document
+---
+
+```{r}
+library(data.table)
+library(xgboost)
+library(ggplot2)
+```
+
+```{r}
+train_dataset <- fread("data_in/cleaned_train.csv")
+```
+
+Create test set 30%
+```{r, include=FALSE}
+#in order to have the same data set on each run
+set.seed(12389)
+#split 30% to the test set
+test_seq <- sample(nrow(train_dataset), as.integer(nrow(train_dataset)*0.30))
+test_set <- train_dataset[test_seq]
+
+training_set <- train_dataset[-test_seq]
+
+
+
+fwrite(test_set, "data_in/test_set.csv")
+fwrite(training_set, "data_in/training_set.csv")
+```
