@@ -2,11 +2,7 @@
 .Rhistory
 .RData
 .Ruserdata
-<<<<<<< HEAD
 data_in/
 .RDataTmp*
 *.Rdata
 *.html
-=======
-.Proj
->>>>>>> 1a8c3e3e07b4c6db62056caed9bbb0bd06ac29d7
