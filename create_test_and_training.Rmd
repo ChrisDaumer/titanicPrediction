@@ -4,6 +4,8 @@ output: html_document
 ---
 
 ```{r}
+rm(list=ls())
+
 library(data.table)
 library(xgboost)
 library(ggplot2)

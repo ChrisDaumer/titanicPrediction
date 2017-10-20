@@ -4,6 +4,8 @@ output: html_document
 ---
 
 ```{r}
+rm(list=ls())
+
 library(data.table)
 library(xgboost)
 library(ggplot2)
@@ -13,6 +15,7 @@ library(ggplot2)
 train_dataset <- fread("data_in/training_set.csv")
 test_dataset <- fread("data_in/test_set.csv")
 ```
+
 
 ```{r}
 train_label <- train_dataset$Survived
@@ -28,17 +31,17 @@ bst.res <- xgb.cv(nfold=3,
                data = train_matrix, 
                label = train_label,
                eta = 0.01,
-               min_child_weight = 12,
+               min_child_weight = 8,
                max_depth = 2,
                objective = "reg:linear",
                #L2 parameter 
                lambda = 1.1,
                # L1 parameter 
                alpha = 0.5, 
-               subsample = 0.6,
+               subsample = 0.7,
                # eval_metric = "auc",
                gamma = 1,
-               nrounds = 4000,
+               nrounds = 1000,
                verbose = TRUE,
                print_every_n = 10,
                early_stop_round = 10)
@@ -77,11 +80,21 @@ bst <- xgboost(data = train_matrix,
                subsample = 0.6,
                # eval_metric = "auc",
                gamma = 1,
-               nrounds = 4000,
+               nrounds = 2000,
                verbose = TRUE,
                print_every_n = 10,
                early_stop_round = 10)
 ```
+
+
+XGboost feature importance
+```{r}
+res.importance <- xgb.importance(feature_names = names(train_matrix), model = bst)
+
+ggplot(res.importance, aes(y=Gain, x=Feature)) + geom_bar(stat="identity")
+```
+
+
 
 
 ROC & AUC
@@ -121,7 +134,6 @@ p <- p + geom_text(x=0.25, y=0.5, label=paste0("AUC : ",round(auc_value,2)))
 p <- p + theme_minimal()
 p
 ```
-
 
 
 

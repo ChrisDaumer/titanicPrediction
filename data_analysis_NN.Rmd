@@ -1,0 +1,107 @@
+---
+title: "data_cleaning"
+output: html_document
+---
+
+```{r}
+rm(list=ls())
+detach(package:ROCR,unload = T)
+
+library(data.table)
+library(neuralnet)
+library(ggplot2)
+```
+
+```{r}
+train_dataset <- fread("data_in/training_set.csv")
+test_dataset <- fread("data_in/test_set.csv")
+```
+
+Remove NA
+```{r}
+# sapply(train_dataset, function(x) length(which(is.na(x))))
+
+train_dataset[is.na(Age), Age := mean(train_dataset$Age, na.rm = TRUE)]
+test_dataset[is.na(Age), Age := mean(test_dataset$Age, na.rm = TRUE)]
+```
+
+dataset scaling
+```{r}
+maxs <- apply(train_dataset, 2, max) 
+mins <- apply(train_dataset, 2, min)
+
+scaled_trained_dataset <- as.data.table(scale(train_dataset, center = mins, scale = maxs - mins))
+
+
+maxs <- apply(test_dataset, 2, max) 
+mins <- apply(test_dataset, 2, min)
+
+scaled_test_dataset <- as.data.table(scale(test_dataset, center = mins, scale = maxs - mins))
+```
+
+
+Train a NN model
+```{r}
+n <- names(scaled_trained_dataset)
+f <- as.formula(paste("Survived ~", paste(n[!n %in% "Survived"], collapse = " + ")))
+
+nn <- neuralnet(f, data=scaled_trained_dataset,hidden=c(5),linear.output=F)
+```
+
+
+```{r}
+plot(nn)
+```
+
+
+```{r}
+prob <- compute(nn,scaled_test_dataset[,-c("Survived")])
+
+prob.result <- prob$net.result
+
+detach(package:neuralnet,unload = T)
+
+library(ROCR)
+nn.pred = prediction(prob.result, scaled_test_dataset$Survived)
+# pref <- performance(nn.pred, "tpr", "fpr")
+# plot(pref)
+```
+
+ROC & AUC
+```{r}
+simple_roc <- function(labels, scores){
+  labels <- labels[order(scores, decreasing=TRUE)]
+  data.frame(TPR=cumsum(labels)/sum(labels), FPR=cumsum(!labels)/sum(!labels), labels)
+}
+res.pred <- unlist(nn.pred@predictions)
+res.pred[res.pred > .5] <- 1
+res.pred[res.pred < .5] <- 0
+glm_simple_roc <- simple_roc(scaled_test_dataset$Survived, res.pred)
+```
+
+
+```{r}
+simple_auc <- function(TPR, FPR){
+  # inputs already sorted, best scores first 
+  dFPR <- c(diff(FPR), 0)
+  dTPR <- c(diff(TPR), 0)
+  sum(TPR * dFPR) + sum(dTPR * dFPR)/2
+}
+
+auc_value <- simple_auc(glm_simple_roc$TPR,glm_simple_roc$FPR)
+auc_value
+```
+
+```{r}
+p <- ggplot(glm_simple_roc,aes(FPR,TPR))
+p <- p + geom_abline(slope = 1, color="red",
+                 linetype="dashed", size=1.5)
+p <- p + geom_line(size = 1, alpha = 0.7)
+p <- p +labs(title= "ROC curve", 
+             x = "False Positive Rate (1-Specificity)", 
+             y = "True Positive Rate (Sensitivity)")
+
+p <- p + geom_text(x=0.25, y=0.5, label=paste0("AUC : ",round(auc_value,2))) 
+p <- p + theme_minimal()
+p
+```
